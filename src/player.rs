@@ -11,6 +11,11 @@ pub struct PlayerMovement {
 	pub desired_velocity: Vec3,
 	pub grounded: bool,
 }
+#[derive(Resource, Clone, Copy, PartialEq, Debug, Default)]
+pub struct MouseMovement {
+	pub average_speed: f32,
+	pub average_velocity: Vec2,
+}
 
 #[derive(Component, Clone, Copy, PartialEq, Debug, Default)]
 pub struct PlayerCamera {
@@ -26,8 +31,10 @@ impl Plugin for PlayerPlugin {
 	fn build(&self, app: &mut App) {
 		app
 			.init_resource::<PlayerMesh>()
+			.init_resource::<MouseMovement>()
 			.add_systems(Startup, load_player_mesh)
 			.add_systems(OnEnter(crate::state::GameState::InLevel), spawn_player)
+			.add_systems(PreUpdate, process_mouse_movement)
 			.add_systems(Update, (rotate_player, player_move_input))
 			.add_systems(Update, player_kinematics.before(PhysicsSet::SyncBackend))
 			.add_systems(Update, read_result_system)
@@ -81,6 +88,24 @@ fn spawn_player(
 	});
 }
 
+fn process_mouse_movement(
+	mut mouse_inputs: EventReader<MouseMotion>,
+	mut mouse_statistics: ResMut<MouseMovement>,
+) {
+	let mut dmouse: Vec2 = Vec2::ZERO;
+
+	for input in mouse_inputs.read() {
+		dmouse += input.delta;
+	}
+
+	// Exponentially tracked moving average
+	let percentage = 0.05;
+	mouse_statistics.average_speed *= 1.0 - percentage;
+	mouse_statistics.average_velocity *= 1.0 - percentage;
+	mouse_statistics.average_speed += dmouse.length() * percentage;
+	mouse_statistics.average_velocity += dmouse * percentage;
+}
+
 fn rotate_player(
 	mut player: Query<&mut Transform, With<Player>>,
 	mut camera: Query<(&mut Transform, &mut PlayerCamera), Without<Player>>,
@@ -111,21 +136,11 @@ fn rotate_player(
 fn player_move_input(
 	mut player: Query<(&Transform, &mut PlayerMovement), With<Player>>,
 	camera: Query<&PlayerCamera, Without<Player>>,
-	mut mouse_inputs: EventReader<MouseMotion>,
+	mouse_data: Res<MouseMovement>,
 	time: Res<Time>,
 ) {
 	let Ok(camera_angle) = camera.get_single() else {return;};
 	let dt = time.delta_seconds();
-
-	let mut dmouse: Vec2 = Vec2::ZERO;
-
-	for input in mouse_inputs.read() {
-		dmouse += input.delta;
-	}
-
-	// TODO: Figure out sensitivity
-	let sensitivity = 0.001;
-	let min_speed = sensitivity * 3.0;
 
 	let max_acceleration = 15.0;
 	let min_acceleration = 3.0;
@@ -134,27 +149,33 @@ fn player_move_input(
 		max_acceleration * t + min_acceleration * (1.0 - t)
 	};
 
-	dmouse *= sensitivity;
+	let min_speed = dt * 300.0;
 
-	if dmouse.length_squared() > (min_speed * dt) * (min_speed * dt) {
+	// Gotta check we are circling with cursor
+	if mouse_data.average_speed > mouse_data.average_velocity.length() && mouse_data.average_speed > min_speed {
 		for (transform, mut player) in player.iter_mut() {
-			if player.time_accelerating < 0.25 {
-				player.time_accelerating = 0.25;
+			let min_time_acceleration = 0.5;
+			if player.time_accelerating < min_time_acceleration {
+				player.time_accelerating = min_time_acceleration;
+				player.desired_velocity += min_time_acceleration * acceleration * transform.forward()
 			}
 			player.time_accelerating += dt;
-			player.desired_velocity = 
-				(player.desired_velocity + transform.forward() * dt * acceleration)
-				.clamp_length_max(player.time_accelerating * max_acceleration);
+			player.desired_velocity += transform.forward() * dt * acceleration;
+			// Rotate velocity vector towards transform.forward
+			let axis = player.desired_velocity.cross(transform.forward()).y * transform.up();
+			let delta = dt * player.desired_velocity.cross(axis);
+			// Ultra yee-yee ass rotation, might work tho
+			let speed = player.desired_velocity.length();
+			if speed > 0.1 {
+				player.desired_velocity -= delta / speed;
+			}
+
+			player.desired_velocity = player.desired_velocity.clamp_length_max(player.time_accelerating * max_acceleration)
 		}
 	} else {
 		for (_, mut player) in player.iter_mut() {
-			if player.time_accelerating < 0.0 {
-				player.time_accelerating = 0.0;
-			} else {
-				// Exponential-type decay
-				player.time_accelerating -= (10.0 + player.time_accelerating) * dt;
-			}
-			player.desired_velocity = player.desired_velocity.clamp_length_max(player.time_accelerating * max_acceleration);
+			player.time_accelerating *= 0.9;
+			player.desired_velocity *= 0.95;
 		}
 	}
 }
