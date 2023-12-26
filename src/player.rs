@@ -117,6 +117,8 @@ fn rotate_player(
 		dmouse += input.delta;
 	}
 
+	// Invert y
+	dmouse.y *= -1.0;
 	// TODO: Figure out sensitivity
 	let delta_angle = dmouse * 0.005;
 
@@ -186,7 +188,7 @@ fn player_kinematics(
 ) {
 	let dt = time.delta_seconds();
 	for (mut player, mut kinematic_body) in player.iter_mut() {
-		println!("{:?}", player.desired_velocity);
+		//println!("{:?}", player.desired_velocity);
 		if player.grounded {
 			if player.desired_velocity.y <= 0.0 {
 				player.desired_velocity.y = 0.01;
