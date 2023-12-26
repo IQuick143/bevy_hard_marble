@@ -43,13 +43,22 @@ fn test_setup(
 
 fn setup_test_room(
 	mut commands: Commands,
+	assets: Res<AssetServer>,
 	mut meshes: ResMut<Assets<Mesh>>,
+	mut materials: ResMut<Assets<StandardMaterial>>,
 	mut game_state: ResMut<NextState<state::GameState>>,
 ) {
+	let material = materials.add(StandardMaterial {
+		base_color_texture: Some(assets.load::<Image>("grid.png")),
+		alpha_mode: AlphaMode::Blend,
+		unlit: true,
+		..default()
+	});
 	let plane = meshes.add(bevy::render::mesh::shape::Plane::from_size(1000.0).into());
 	commands.spawn((
 		PbrBundle {
 			mesh: plane,
+			material,
 			..Default::default()
 		},
 		(RigidBody::Fixed, Sleeping::default(), Collider::halfspace(Vec3::Y).unwrap())
