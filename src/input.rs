@@ -9,11 +9,11 @@ pub struct InputMap {
 }
 
 impl Default for InputMap {
-    fn default() -> Self {
-        Self {
+	fn default() -> Self {
+		Self {
 			velocity_lock: KeyCode::ShiftLeft
 		}
-    }
+	}
 }
 
 #[derive(Resource, Debug, PartialEq)]
@@ -25,11 +25,11 @@ pub struct InputSettings {
 }
 
 impl Default for InputSettings {
-    fn default() -> Self {
-        Self {
+	fn default() -> Self {
+		Self {
 			camera_sensitivity: 0.005
 		}
-    }
+	}
 }
 
 impl Plugin for InputPlugin {
