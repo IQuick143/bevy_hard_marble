@@ -5,20 +5,32 @@ use bevy_rapier3d::prelude::*;
 
 #[derive(Component, Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 pub struct Player;
+
+/// Contains all game-logic information (input and kinematics) about player movement
+/// More relevant data can be found in an attached `Transform` and `KinematicCharacterController`
 #[derive(Component, Clone, Copy, PartialEq, Debug, Default)]
 pub struct PlayerMovement {
+	/// How long we've been accelerating, determines max speed among other things
 	pub time_accelerating: f32,
+	/// Velocity vector the player is trying to move at
 	pub desired_velocity: Vec3,
+	/// Whether the physics engine said we are touching ground
 	pub grounded: bool,
+	/// Whether the velocity vector should be locked from being changed by inputs
+	pub locked_velocity: bool,
 }
+
 #[derive(Resource, Clone, Copy, PartialEq, Debug, Default)]
 pub struct MouseMovement {
+	/// An averaged speed value, roughly corresponding to how quickly mouse is moving around
 	pub average_speed: f32,
+	/// An averaged velocity vector, roughly corresponding to overall mouse movement
 	pub average_velocity: Vec2,
 }
 
 #[derive(Component, Clone, Copy, PartialEq, Debug, Default)]
 pub struct PlayerCamera {
+	/// Angle between -pi/2 and +pi/2 measuring the pitch of the camera
 	pitch: f32
 }
 
@@ -34,10 +46,12 @@ impl Plugin for PlayerPlugin {
 			.init_resource::<MouseMovement>()
 			.add_systems(Startup, load_player_mesh)
 			.add_systems(OnEnter(crate::state::GameState::InLevel), spawn_player)
-			.add_systems(PreUpdate, process_mouse_movement)
-			.add_systems(Update, (rotate_player, player_move_input))
-			.add_systems(Update, player_kinematics.before(PhysicsSet::SyncBackend))
-			.add_systems(Update, read_result_system)
+			.add_systems(Update, (
+				process_mouse_movement,
+				(rotate_player, player_move_input),
+				player_kinematics.before(PhysicsSet::SyncBackend)
+			).chain())
+			.add_systems(Update, read_result_system.after(PhysicsSet::Writeback))
 		;
 	}
 }
