@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use bevy::{prelude::*, input::mouse::MouseMotion};
 use bevy_rapier3d::prelude::*;
 
-use crate::input::InputSettings;
+use crate::input::{InputSettings, InputMap};
 
 #[derive(Component, Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 pub struct Player;
@@ -49,7 +49,7 @@ impl Plugin for PlayerPlugin {
 			.add_systems(Startup, load_player_mesh)
 			.add_systems(OnEnter(crate::state::GameState::InLevel), spawn_player)
 			.add_systems(Update, (
-				process_mouse_movement,
+				(process_mouse_movement, process_input_modifiers),
 				(rotate_player, player_move_input),
 				player_kinematics.before(PhysicsSet::SyncBackend)
 			).chain())
@@ -122,6 +122,19 @@ fn process_mouse_movement(
 	mouse_statistics.average_velocity += dmouse * percentage;
 }
 
+fn process_input_modifiers(
+	mut player: Query<&mut PlayerMovement>,
+	keyboard_inputs: Res<Input<KeyCode>>,
+	input_map: Res<InputMap>,
+) {
+	if keyboard_inputs.just_pressed(input_map.velocity_lock) {
+		for mut player in player.iter_mut() {
+			// Switch
+			player.locked_velocity ^= true;
+		}
+	}
+}
+
 fn rotate_player(
 	mut player: Query<&mut Transform, With<Player>>,
 	mut camera: Query<(&mut Transform, &mut PlayerCamera), Without<Player>>,
@@ -173,6 +186,8 @@ fn player_move_input(
 	// Gotta check we are circling with cursor
 	if mouse_data.average_speed > mouse_data.average_velocity.length() && mouse_data.average_speed > min_speed {
 		for (transform, mut player) in player.iter_mut() {
+			// If the player locks their velocity, then we do not change it
+			if player.locked_velocity {continue;}
 			let min_time_acceleration = 0.5;
 			if player.time_accelerating < min_time_acceleration {
 				player.time_accelerating = min_time_acceleration;
@@ -193,6 +208,8 @@ fn player_move_input(
 		}
 	} else {
 		for (_, mut player) in player.iter_mut() {
+			// If the player locks their velocity, then we do not change it
+			if player.locked_velocity {continue;}
 			player.time_accelerating *= 0.9;
 			player.desired_velocity *= 0.95;
 		}
