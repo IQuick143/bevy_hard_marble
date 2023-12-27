@@ -20,6 +20,8 @@ pub struct PlayerMovement {
 	pub grounded: bool,
 	/// Whether the velocity vector should be locked from being changed by inputs
 	pub locked_velocity: bool,
+	/// Whether a velocity lock just started
+	pub just_locked_velocity: bool,
 }
 
 #[derive(Resource, Clone, Copy, PartialEq, Debug, Default)]
@@ -127,11 +129,12 @@ fn process_input_modifiers(
 	keyboard_inputs: Res<Input<KeyCode>>,
 	input_map: Res<InputMap>,
 ) {
-	if keyboard_inputs.just_pressed(input_map.velocity_lock) {
-		for mut player in player.iter_mut() {
-			// Switch
-			player.locked_velocity ^= true;
-		}
+	let lock_pressed = keyboard_inputs.just_pressed(input_map.velocity_lock);
+	for mut player in player.iter_mut() {
+		// Switch
+		player.locked_velocity ^= lock_pressed;
+		// Engage
+		player.just_locked_velocity = player.locked_velocity & lock_pressed;
 	}
 }
 
@@ -184,10 +187,27 @@ fn player_move_input(
 	let min_speed = dt * 300.0;
 
 	// Gotta check we are circling with cursor
-	if mouse_data.average_speed > mouse_data.average_velocity.length() && mouse_data.average_speed > min_speed {
-		for (transform, mut player) in player.iter_mut() {
-			// If the player locks their velocity, then we do not change it
-			if player.locked_velocity {continue;}
+	let player_is_trying_to_accelerate = mouse_data.average_speed > mouse_data.average_velocity.length() && mouse_data.average_speed > min_speed;
+
+	for (transform, mut player) in player.iter_mut() {
+		// If the player locks their velocity, we snap it forwards
+		if player.just_locked_velocity {
+			let mut free_velocity = player.desired_velocity;
+			if free_velocity.y < 0.0 {
+				// Downwards velocity is not very valuable
+				free_velocity.y *= 0.1;
+			}
+			let free_speed = free_velocity.length();
+			let directly_in_front_of_my_face = 
+				f32::cos(camera_angle.pitch) * transform.forward() +
+				f32::sin(camera_angle.pitch) * transform.up()
+			;
+			player.desired_velocity = free_speed * directly_in_front_of_my_face;
+		}
+		// If the player locked their velocity, then we do not change it in movement control code
+		if player.locked_velocity {continue;}
+
+		if player_is_trying_to_accelerate {
 			let min_time_acceleration = 0.5;
 			if player.time_accelerating < min_time_acceleration {
 				player.time_accelerating = min_time_acceleration;
@@ -205,11 +225,8 @@ fn player_move_input(
 			}
 
 			player.desired_velocity = player.desired_velocity.clamp_length_max(player.time_accelerating * max_acceleration)
-		}
-	} else {
-		for (_, mut player) in player.iter_mut() {
-			// If the player locks their velocity, then we do not change it
-			if player.locked_velocity {continue;}
+		} else {
+			// TODO: Add some sort of coyote-time to various actions to help conserve speed when desirable
 			player.time_accelerating *= 0.9;
 			player.desired_velocity *= 0.95;
 		}
