@@ -2,6 +2,7 @@ mod player;
 mod state;
 #[cfg(debug_assertions)]
 mod debug;
+mod input;
 
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
@@ -18,7 +19,10 @@ fn main() {
 	#[cfg(debug_assertions)]
 	{app.add_plugins(debug::DebugPlugin);}
 	app.add_systems(Startup, (test_setup, setup_test_room));
-	app.add_plugins(player::PlayerPlugin);
+	app.add_plugins((
+		input::InputPlugin,
+		player::PlayerPlugin,
+	));
 	app.run();
 }
 

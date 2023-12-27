@@ -3,6 +3,8 @@ use std::f32::consts::PI;
 use bevy::{prelude::*, input::mouse::MouseMotion};
 use bevy_rapier3d::prelude::*;
 
+use crate::input::InputSettings;
+
 #[derive(Component, Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 pub struct Player;
 
@@ -124,6 +126,7 @@ fn rotate_player(
 	mut player: Query<&mut Transform, With<Player>>,
 	mut camera: Query<(&mut Transform, &mut PlayerCamera), Without<Player>>,
 	mut mouse_inputs: EventReader<MouseMotion>,
+	input_config: Res<InputSettings>,
 ) {
 	let mut dmouse: Vec2 = Vec2::ZERO;
 
@@ -134,7 +137,7 @@ fn rotate_player(
 	// Invert y
 	dmouse.y *= -1.0;
 	// TODO: Figure out sensitivity
-	let delta_angle = dmouse * 0.005;
+	let delta_angle = dmouse * input_config.camera_sensitivity;
 
 	if delta_angle.length_squared() > 0.00001 {
 		for mut transform in player.iter_mut() {
