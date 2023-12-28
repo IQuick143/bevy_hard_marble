@@ -3,6 +3,7 @@ mod state;
 #[cfg(debug_assertions)]
 mod debug;
 mod input;
+mod ui;
 
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
@@ -20,6 +21,7 @@ fn main() {
 	{app.add_plugins(debug::DebugPlugin);}
 	app.add_systems(Startup, (test_setup, setup_test_room));
 	app.add_plugins((
+		ui::UIPlugin,
 		input::InputPlugin,
 		player::PlayerPlugin,
 	));
