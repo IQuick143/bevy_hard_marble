@@ -3,6 +3,7 @@ mod state;
 #[cfg(debug_assertions)]
 mod debug;
 mod input;
+mod meme;
 mod ui;
 
 use bevy::prelude::*;
@@ -67,7 +68,12 @@ fn setup_test_room(
 			material,
 			..Default::default()
 		},
-		(RigidBody::Fixed, Sleeping::default(), Collider::halfspace(Vec3::Y).unwrap())
+		(RigidBody::Fixed, Sleeping::default(), Collider::halfspace(Vec3::Y).unwrap()),
+		meme::MemeContainer {
+			container_type: meme::ContainerType::Electronic,
+			container_activity: meme::ContainerActivity::Passive,
+			contains_infohazard: true
+		},
 	));
 	game_state.0 = Some(state::GameState::InLevel);
 }

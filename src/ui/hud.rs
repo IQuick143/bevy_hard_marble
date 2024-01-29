@@ -4,9 +4,7 @@ use bevy::{
 	a11y::{
 		accesskit::{NodeBuilder, Role},
 		AccessibilityNode,
-	},
-	input::mouse::{MouseScrollUnit, MouseWheel},
-	prelude::*
+	}, input::mouse::{MouseScrollUnit, MouseWheel}, prelude::*
 };
 
 use bevy::app::{Plugin, App};
@@ -17,10 +15,13 @@ pub struct HUDPlugin;
 /// Resource containing all data that the hud wants to display
 struct HUDData {
 	player_locked_momentum: bool,
+	meme_data: Vec<String>,
 }
 
 #[derive(Component)]
 struct MomentumLockIndicatorText;
+#[derive(Component)]
+struct TargetListText;
 
 impl Plugin for HUDPlugin {
 	fn build(&self, app: &mut App) {
@@ -29,8 +30,13 @@ impl Plugin for HUDPlugin {
 		.add_systems(Startup, setup)
 		.add_systems(Update, mouse_scroll)
 		.add_systems(Update, (
-			update_hud_data_from_player_data,
-			(update_hud_momentum_lock),
+			(
+				update_hud_data_from_player_data,
+				update_hud_data_from_memetics,
+			), (
+				update_hud_momentum_lock,
+				update_target_list,
+			),
 		).chain())
 		;
 	}
@@ -148,22 +154,20 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 									AccessibilityNode(NodeBuilder::new(Role::List)),
 								))
 								.with_children(|parent| {
-									// List items
-									for i in 0..30 {
-										parent.spawn((
-											TextBundle::from_section(
-												format!("TODO {i} TODO"),
-												TextStyle {
-													font: asset_server
-														.load("fonts/ComicMono.ttf"),
-													font_size: 20.,
-													..default()
-												},
-											),
-											Label,
-											AccessibilityNode(NodeBuilder::new(Role::ListItem)),
-										));
-									}
+									let font = asset_server.load("fonts/ComicShannsV2.ttf");
+									let style = TextStyle {
+										font,
+										font_size: 20.,
+										..default()
+									};
+									parent.spawn((
+										TextBundle::from_section(
+											format!("THIS PLACEHOLDER IS COMPLETELY INTENTIONAL\n"), style
+										),
+										TargetListText,
+										Label,
+										AccessibilityNode(NodeBuilder::new(Role::ListItem)),
+									));
 								});
 						});
 				});
@@ -199,6 +203,17 @@ fn mouse_scroll(
 	}
 }
 
+fn update_hud_data_from_memetics(
+	memetics: Query<&crate::meme::MemeContainer>,
+	mut hud_data: ResMut<HUDData>
+) {
+	hud_data.meme_data.clear();
+
+	for meme in memetics.iter() {
+		hud_data.meme_data.push(format!("{:?} {:?}", meme.container_type, meme.contains_infohazard))
+	}
+}
+
 fn update_hud_data_from_player_data(
 	player: Query<&crate::player::PlayerMovement>,
 	mut hud_data: ResMut<HUDData>
@@ -223,5 +238,28 @@ fn update_hud_momentum_lock(
 		// I trust my ass to not fuck this up in the hud creation
 		indicator.sections[1].value = (if hud_data.player_locked_momentum {"ENABLED"} else {"DISABLED"}).into();
 		indicator.sections[1].style.color = if hud_data.player_locked_momentum {Color::GREEN} else {Color::PINK};
+	}
+}
+
+fn update_target_list(
+	mut list_query: Query<&mut Text, With<TargetListText>>,
+	hud_data: Res<HUDData>,
+	asset_server: Res<AssetServer>
+) {
+	let font = asset_server.load("fonts/ComicShannsV2.ttf");
+	let default_style = TextStyle {
+		font,
+		font_size: 20.,
+		..default()
+	};
+	for mut list_text in list_query.iter_mut() {
+		list_text.sections.clear();
+		list_text.sections.extend(hud_data.meme_data.iter().map(
+			|text| {
+				TextSection {
+					value: format!("{text}\n"), style: default_style.clone()
+				}
+			}
+		));
 	}
 }
