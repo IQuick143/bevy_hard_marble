@@ -5,12 +5,14 @@ pub struct InputPlugin;
 #[derive(Resource, Debug, PartialEq)]
 /// A mapping of all the actions to KeyCodes, use this for KeyCode constants + storing keymap settings
 pub struct InputMap {
+	pub terminal_key: KeyCode,
 	pub velocity_lock: KeyCode,
 }
 
 impl Default for InputMap {
 	fn default() -> Self {
 		Self {
+			terminal_key: KeyCode::T,
 			velocity_lock: KeyCode::ShiftLeft
 		}
 	}

@@ -1,3 +1,4 @@
+mod bevy_simple_text_input;
 mod player;
 mod state;
 #[cfg(debug_assertions)]
@@ -22,6 +23,7 @@ fn main() {
 	{app.add_plugins(debug::DebugPlugin);}
 	app.add_systems(Startup, (test_setup, setup_test_room));
 	app.add_plugins((
+        bevy_simple_text_input::TextInputPlugin,
 		ui::UIPlugin,
 		input::InputPlugin,
 		player::PlayerPlugin,

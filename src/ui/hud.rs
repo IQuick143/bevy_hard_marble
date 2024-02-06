@@ -6,18 +6,26 @@ use bevy::{
 		AccessibilityNode,
 	}, input::mouse::{MouseScrollUnit, MouseWheel}, prelude::*
 };
+use crate::bevy_simple_text_input::TextInput;
 
 use bevy::app::{Plugin, App};
+
+use crate::input::InputMap;
 
 pub struct HUDPlugin;
 
 #[derive(Resource, Default)]
 /// Resource containing all data that the hud wants to display
 struct HUDData {
+	terminal_open: bool,
 	player_locked_momentum: bool,
 	meme_data: Vec<String>,
 }
 
+#[derive(Component)]
+struct TerminalWindow;
+#[derive(Component)]
+struct TerminalTextInput;
 #[derive(Component)]
 struct MomentumLockIndicatorText;
 #[derive(Component)]
@@ -31,9 +39,11 @@ impl Plugin for HUDPlugin {
 		.add_systems(Update, mouse_scroll)
 		.add_systems(Update, (
 			(
+				update_hud_data_from_player_inputs,
 				update_hud_data_from_player_data,
 				update_hud_data_from_memetics,
 			), (
+				update_hud_terminal,
 				update_hud_momentum_lock,
 				update_target_list,
 			),
@@ -99,6 +109,60 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 							));
 						});
 				});
+			// Middle command terminal
+			parent
+				.spawn((NodeBundle {
+					style: Style {
+						flex_direction: FlexDirection::Column,
+						justify_content: JustifyContent::Center,
+						align_items: AlignItems::Center,
+						width: Val::Percent(69.),
+						..default()
+					},
+					visibility: Visibility::Hidden,
+					background_color: Color::rgba(0.15, 0.10, 0.20, 0.5).into(),
+					..default()
+				},
+					TerminalWindow,
+				))
+				.with_children(|parent| {
+					parent.spawn((
+						TextBundle::from_section("", TextStyle {
+							font: asset_server.load("fonts/ComicShannsV2.ttf"),
+							font_size: 25.,
+							..default()
+						}).with_style(Style {
+							width: Val::Percent(100.),
+							height: Val::Percent(100.),
+							..default()
+						}),
+						Label
+					));
+					parent.spawn((
+						NodeBundle {
+							style: Style {
+								width: Val::Percent(100.),
+								border: UiRect::all(Val::Px(1.0)),
+								padding: UiRect::all(Val::Px(5.0)),
+								..default()
+							},
+							border_color: Color::GOLD.into(),
+							background_color: Color::BLACK.into(),
+							..default()
+						},
+						TextInput {
+							text_style: TextStyle {
+								font: asset_server.load("fonts/ComicShannsV2.ttf"),
+								font_size: 40.,
+								color: Color::rgb(0.9, 0.9, 0.9),
+								..default()
+							},
+							inactive: true
+						},
+						TerminalTextInput,
+						Label
+					));
+			});
 			// right vertical fill
 			parent
 				.spawn(NodeBundle {
@@ -106,10 +170,10 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 						flex_direction: FlexDirection::Column,
 						justify_content: JustifyContent::Center,
 						align_items: AlignItems::Center,
-						width: Val::Px(200.),
+						width: Val::Percent(15.),
 						..default()
 					},
-					background_color: Color::rgb(0.15, 0.15, 0.15).into(),
+					background_color: Color::rgba(0.15, 0.15, 0.20, 0.7).into(),
 					..default()
 				})
 				.with_children(|parent| {
@@ -203,6 +267,16 @@ fn mouse_scroll(
 	}
 }
 
+fn update_hud_data_from_player_inputs(
+	inputs: Res<Input<KeyCode>>,
+	input_map: Res<InputMap>,
+	mut hud_data: ResMut<HUDData>
+) {
+	if inputs.just_pressed(input_map.terminal_key) {
+		hud_data.terminal_open = !hud_data.terminal_open;
+	}
+}
+
 fn update_hud_data_from_memetics(
 	memetics: Query<&crate::meme::MemeContainer>,
 	mut hud_data: ResMut<HUDData>
@@ -228,6 +302,19 @@ fn update_hud_data_from_player_data(
 	}) else {return;};
 
 	hud_data.player_locked_momentum = player.locked_velocity;
+}
+
+fn update_hud_terminal(
+	mut terminal_window: Query<&mut Visibility, With<TerminalWindow>>,
+	mut terminal_input: Query<&mut TextInput, With<TerminalTextInput>>,
+	hud_data: Res<HUDData>
+) {
+	for mut window_visibility in terminal_window.iter_mut() {
+		*window_visibility = if hud_data.terminal_open {Visibility::Visible} else {Visibility::Hidden};
+	}
+	for mut text_input in terminal_input.iter_mut() {
+		text_input.inactive = !hud_data.terminal_open;
+	}
 }
 
 fn update_hud_momentum_lock(
